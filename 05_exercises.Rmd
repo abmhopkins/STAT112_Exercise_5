@@ -99,15 +99,32 @@ Once your repository is created, you should always open your **project** rather 
 
 I have started the code for you below. The `complete()` function creates a row for all unique `date`/`variety` combinations. If a variety is not harvested on one of the harvest dates in the dataset, it is filled with a value of 0.
 
-```{r}
+```{r, eval = FALSE}
 garden_harvest %>% 
   filter(vegetable == "tomatoes") %>% 
   group_by(date, variety) %>% 
   summarize(daily_harvest_lb = sum(weight)*0.00220462) %>% 
   ungroup() %>% 
-  complete(variety, date, fill = list(daily_harvest_lb = 0))
+  complete(variety, date, fill = list(daily_harvest_lb = 0)) %>% 
+  group_by(variety) %>% 
+  mutate(cum_sum = cumsum(daily_harvest_lb),
+         total_harvest = sum(daily_harvest_lb)) %>% 
+  ggplot(mapping = aes(x = date, y = cum_sum, fill = fct_reorder(variety, total_harvest))) +
+  geom_area() +
+  labs(title = "Cumulative harvest (lbs) of tomatoes by variety",
+       x = "",
+       y = "",
+       fill = "") +
+  transition_reveal(along = date)
 ```
 
+```{r,eval=FALSE}
+anim_save("tomatoes_harvest.gif")
+```
+
+```{r, echo=FALSE}
+knitr::include_graphics("tomatoes_harvest.gif")
+```
 
 ## Maps, animation, and movement!
 
@@ -136,6 +153,55 @@ garden_harvest %>%
   * Animate the plot to reveal the pattern by date. Display the date as the subtitle. Add a leading point to each state's line (`geom_point()`) and add the state name as a label (`geom_text()` - you should look at the `check_overlap` argument).  
   * Use the `animate()` function to have 200 frames in your animation and make it 30 seconds long. 
   * Comment on what you observe.
+  
+```{r}
+covid19 %>% 
+  group_by(state) %>% 
+  mutate(week_lag = lag(cases, n = 7, order_by = date)) %>% 
+  replace_na(list(week_lag = 0)) %>% 
+  mutate(new_cases = cases - week_lag) %>% 
+  filter(cases >= 20) %>% 
+  ggplot(mapping = aes(x = cases, y = new_cases, group = state)) +
+  geom_point()+
+  geom_path() +
+  scale_x_log10(labels = scales::comma) +
+  scale_y_log10(labels = scales::comma) +
+  labs(title = "",
+       x = "Total Cases",
+       y = "New Cases (in the Past Week)")
+```
+  
+```{r, eval = FALSE}
+covid_gganim <- covid19 %>% 
+  group_by(state) %>% 
+  mutate(week_lag = lag(cases, n = 7, order_by = date)) %>% 
+  replace_na(list(week_lag = 0)) %>% 
+  mutate(new_cases = cases - week_lag) %>% 
+  filter(cases >= 20) %>% 
+  ggplot(mapping = aes(x = cases, y = new_cases, group = state)) +
+  geom_point(aes(x = cases, y = new_cases), color = "red") +
+  geom_path(color = "grey70") +
+  geom_text(aes(label = state, x = cases, y = new_cases), 
+            check_overlap = TRUE) +
+  scale_x_log10(labels = scales::comma) +
+  scale_y_log10(labels = scales::comma) +
+  labs(subtitle = "{frame_along}",
+       x = "Total Cases",
+       y = "New Cases (in the Past Week)") +
+  transition_reveal(along = date)
+
+animate(covid_gganim, duration = 30, nframes = 200)
+```
+  
+```{r, eval = FALSE, echo = FALSE}
+anim_save("covid_anim.gif")
+```
+  
+```{r, echo=FALSE}
+knitr::include_graphics("covid_anim.gif")
+```
+  
+  At some point, all of the states have linear log growth, which means that the cases were growing exponentially. At this point, the states are all dropping off, and in most cases, the order of the states in terms of total cases is relative to their population (California, Texas, Florida). 
   
   7. In this exercise you will animate a map of the US, showing how cumulative COVID-19 cases per 10,000 residents has changed over time. This is similar to exercises 11 & 12 from the previous exercises, with the added animation! So, in the end, you should have something like the static map you made there, but animated over all the days. The code below gives the population estimates for each state and loads the `states_map` data. Here is a list of details you should include in the plot:
   
